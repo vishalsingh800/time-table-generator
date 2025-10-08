@@ -1,4 +1,6 @@
-# Add Subject
+
+from flask import Flask, request, jsonify
+app = Flask(__name__)# Add Subject
 @app.route('/api/add-subject', methods=['POST'])
 def add_subject():
     data = request.get_json()
