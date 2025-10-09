@@ -2,104 +2,310 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated University Timetable</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://rawgit.com/eKoopmans/html2pdf/master/dist/html2pdf.bundle.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-    <script src="static/script.js" defer></script>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ajay Kumar Garg Engineering College Timetable Generator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='script.js') }}" defer></script>
 
-        header {
-            background-color: #4c5caf;
-            color: white;
-            text-align: center;
-            padding: 1em;
-            font-size: 2em;
-            letter-spacing: 2px;
-            margin-bottom: 20px;
-        }
+  <!-- Libraries -->
+  <script src="https://rawgit.com/eKoopmans/html2pdf/master/dist/html2pdf.bundle.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-        #controlPanel {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        #coursesHeading {
-            font-size: 1.5em;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #4c5caf;
-        }
-
-        #generateTimetable,
-        #saveTimetable {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #4c5caf;
-            color: white;
-            border: none;
-            border-radius: 11px;
-            cursor: pointer;
-            margin-left: 15px;
-        }
-
-        #generateTimetable:hover,
-        #saveTimetable:hover {
-            background-color: #5d45a0;
-        }
-
-        #generateTimetable {
-            margin-right: 10px;
-        }
-    </style>
+  <style>
+    body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+    header { background-color: #4c5caf; color: white; text-align: center; padding: 1em; font-size: 2em; letter-spacing: 2px; margin-bottom: 20px; }
+    #controlPanel { text-align: center; margin-bottom: 20px; }
+    #coursesHeading { font-size: 1.5em; font-weight: bold; margin-bottom: 15px; color: #4c5caf; }
+    #generateTimetable, #saveTimetable, #saveToDatabase, #resetTimetable {
+      margin-top: 10px; padding: 10px; background-color: #4c5caf; color: white; border: none; border-radius: 11px; cursor: pointer; margin-left: 15px;
+    }
+    #generateTimetable:hover, #saveTimetable:hover, #saveToDatabase:hover, #resetTimetable:hover { background-color: #5d45a0; }
+    .drawer { position: fixed; top: 0; left: -250px; width: 250px; height: 100%; background: #fff; box-shadow: 2px 0 5px rgba(0,0,0,0.2); padding: 20px; transition: left 0.3s ease-in-out; overflow-y: auto; z-index: 1000; }
+    .toggleButton { position: fixed; top: 50%; left: 0; transform: translateY(-50%); background: #4c5caf; color: white; padding: 10px; cursor: pointer; border-radius: 0 5px 5px 0; z-index: 1100; }
+    #timetableContainer { margin: 20px auto; width: 95%; overflow-x: auto; background: white; padding: 15px; border-radius: 10px; box-shadow: 0px 3px 6px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #4c5caf; color: white; }
+    .course-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 1px solid #ccc; padding: 20px; z-index: 1200; box-shadow: 0 5px 15px rgba(0,0,0,0.3); border-radius: 8px; }
+  </style>
 </head>
 
 <body>
-    <header>
-        Automated University Timetable
-    </header>
+  <header>Ajay Kumar Garg Engineering College Timetable Generator</header>
 
-    <div id="controlPanel">
-        <input type="number" id="totalRooms" placeholder="Total Rooms" value="10" />
-        <input type="number" id="classDuration" placeholder="Class Duration (mins)" value="80" />
-        <input type="number" id="breakTime" placeholder="Break Time (mins)" value="10" />
-        <input type="number" id="totalDays" placeholder="Total Days" value="5" />
-        <input type="time" id="startTime" placeholder="Start Time" value="08:30" />
-        <input type="time" id="endTime" placeholder="End Time" value="17:15" />
-        <button id="generateTimetable">Generate Timetable</button>
-        <button id="saveTimetable">Download Timetable</button>
-        <button id="saveToDatabase">Save to Database</button>
-        <button id="resetTimetable">Reset Timetable</button>
+  <!-- Control Panel -->
+  <div id="controlPanel">
+    <input type="number" id="totalRooms" placeholder="Total Rooms" value="10" />
+    <input type="number" id="classDuration" placeholder="Class Duration (mins)" value="80" />
+    <input type="number" id="breakTime" placeholder="Break Time (mins)" value="10" />
+    <input type="number" id="totalDays" placeholder="Total Days" value="5" />
+    <input type="time" id="startTime" value="08:30" />
+    <input type="time" id="endTime" value="17:15" />
+    <button id="generateTimetable">Generate Timetable</button>
+    <button id="saveTimetable">Download Timetable</button>
+    <button id="saveToDatabase">Save to Database</button>
+    <button id="resetTimetable">Reset Timetable</button>
+  </div>
+
+  <!-- Add Data Forms -->
+
+  <div id="dataEntryPanel" style="margin: 20px auto; width: 95%; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0px 3px 6px rgba(0,0,0,0.1); display: flex; gap: 30px; flex-wrap: wrap; justify-content: space-between;">
+    <div style="flex:1; min-width:300px; max-width:400px;">
+      <h2 style="color:#4c5caf;">Add New Subject</h2>
+      <form id="addSubjectForm" style="margin-bottom:20px; display: flex; flex-direction: column; gap: 12px; background: #f8f9fa; padding: 18px; border-radius: 8px; box-shadow: 0 2px 8px rgba(76,92,175,0.07);">
+        <label for="subjectCode" style="font-weight:500;">Subject Code</label>
+        <input type="text" id="subjectCode" placeholder="Subject Code" required />
+        <label for="subjectName" style="font-weight:500;">Subject Name</label>
+        <input type="text" id="subjectName" placeholder="Subject Name" required />
+        <label for="facultyName" style="font-weight:500;">Faculty Name</label>
+        <input type="text" id="facultyName" placeholder="Faculty Name" required />
+        <label for="venue" style="font-weight:500;">Venue</label>
+        <input type="text" id="venue" placeholder="Venue" required />
+        <button type="submit" style="background:#4c5caf; color:white; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer;">Add Subject</button>
+      </form>
     </div>
-
-    
-    <div id="coursesList" class="drawer" style="left: -250px;">
-        <div id="coursesHeading">Courses List</div>
+    <div style="flex:1; min-width:300px; max-width:400px;">
+      <h2 style="color:#4c5caf;">Add New Room</h2>
+      <form id="addRoomForm" style="margin-bottom:20px; display: flex; flex-direction: column; gap: 12px; background: #f8f9fa; padding: 18px; border-radius: 8px; box-shadow: 0 2px 8px rgba(76,92,175,0.07);">
+        <label for="roomNumber" style="font-weight:500;">Room Number</label>
+        <input type="text" id="roomNumber" placeholder="Room Number" required />
+        <label for="buildingName" style="font-weight:500;">Building Name</label>
+        <input type="text" id="buildingName" placeholder="Building Name" required />
+        <button type="submit" style="background:#4c5caf; color:white; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer;">Add Room</button>
+      </form>
     </div>
-    <div id="toggleButton" onclick="toggleDrawer()" class="toggleButton">&#10095;</div>
-
-    <div id="timetableContainer">
-        <!-- Timetable will be generated here -->
+    <div style="flex:1; min-width:300px; max-width:400px;">
+      <h2 style="color:#4c5caf;">Add New Instructor</h2>
+      <form id="addInstructorForm" style="display: flex; flex-direction: column; gap: 12px; background: #f8f9fa; padding: 18px; border-radius: 8px; box-shadow: 0 2px 8px rgba(76,92,175,0.07);">
+        <label for="instructorName" style="font-weight:500;">Instructor Name</label>
+        <input type="text" id="instructorName" placeholder="Instructor Name" required />
+        <button type="submit" style="background:#4c5caf; color:white; border:none; border-radius:6px; padding:10px; font-weight:600; cursor:pointer;">Add Instructor</button>
+      </form>
     </div>
-
-    <!-- Popup for Course Details -->
-    <div id="coursePopup" class="course-popup" style="display: none;">
-        <div class="course-details">
-            <!-- Content will be dynamically filled -->
-        </div>
-    </div>
+  </div>
 
 
-    
+  <!-- Courses & Subjects Drawer -->
+  <div id="coursesList" class="drawer">
+    <div id="coursesHeading">Courses List</div>
+  <ul id="courses-list" style="padding-left:0; list-style:none;"></ul>
+    <div style="margin-top:30px; font-size:1.2em; color:#4c5caf; font-weight:bold;">Subjects List</div>
+    <ul id="subjects-list" style="margin-top:10px;"></ul>
+  </div>
+  <div id="toggleButton" onclick="toggleDrawer()" class="toggleButton">&#10095;</div>
+
+  <!-- Timetable -->
+  <div id="timetableContainer">
+    <table id="timetable">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Time</th>
+          <th>Course</th>
+          <th>Instructor</th>
+          <th>Room</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Course Popup -->
+  <div id="coursePopup" class="course-popup" style="display: none;">
+    <div class="course-details"></div>
+  </div>
+
+  <script>
+    // --- Drawer toggle ---
+    function toggleDrawer() {
+      const drawer = document.getElementById('coursesList');
+      drawer.style.left = drawer.style.left === '0px' ? '-250px' : '0px';
+    }
+
+    // --- Fetch APIs and populate ---
+    async function fetchAllData() {
+      try {
+        const [coursesRes, roomsRes, enrollmentsRes] = await Promise.all([
+          fetch('/api/courses'),
+          fetch('/api/rooms'),
+          fetch('/api/student-enrollments')
+        ]);
+        const courses = await coursesRes.json();
+        const rooms = await roomsRes.json();
+        const enrollments = await enrollmentsRes.json();
+
+
+        // Populate courses drawer
+        const coursesList = document.getElementById('courses-list');
+        coursesList.innerHTML = '';
+        courses.forEach(c => {
+          const li = document.createElement('li');
+          li.className = 'course';
+          li.textContent = `${c.name} (${c.section})`;
+          coursesList.appendChild(li);
+        });
+
+        // Populate subjects drawer (for now, show course names as subjects)
+        const subjectsList = document.getElementById('subjects-list');
+        subjectsList.innerHTML = '';
+        courses.forEach(c => {
+          const li = document.createElement('li');
+          li.textContent = c.name;
+          subjectsList.appendChild(li);
+        });
+
+        // Generate timetable dynamically
+        generateTimetable(courses, rooms);
+
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        alert("Failed to fetch timetable data. Check console.");
+      }
+    }
+
+    // --- Generate timetable ---
+    function generateTimetable(courses, rooms) {
+      const tbody = document.querySelector('#timetable tbody');
+      tbody.innerHTML = '';
+      const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+      const startTime = 8, endTime = 17; // hours
+
+      let courseIdx = 0;
+
+      for(let d=0; d<days.length; d++) {
+        for(let h=startTime; h<endTime; h++) {
+          const tr = document.createElement('tr');
+          const dayCell = document.createElement('td');
+          dayCell.textContent = days[d];
+          const timeCell = document.createElement('td');
+          timeCell.textContent = `${h}:00 - ${h+1}:00`;
+
+          const courseCell = document.createElement('td');
+          const instructorCell = document.createElement('td');
+          const roomCell = document.createElement('td');
+
+          if(courseIdx < courses.length) {
+            const course = courses[courseIdx];
+            const room = rooms[courseIdx % rooms.length];
+            courseCell.textContent = `${course.name} (${course.section})`;
+            instructorCell.textContent = course.instructor || 'TBD';
+            roomCell.textContent = room.room_number;
+            courseIdx++;
+          }
+
+          tr.appendChild(dayCell);
+          tr.appendChild(timeCell);
+          tr.appendChild(courseCell);
+          tr.appendChild(instructorCell);
+          tr.appendChild(roomCell);
+          tbody.appendChild(tr);
+        }
+      }
+    }
+
+    // --- Buttons ---
+    document.getElementById('generateTimetable').addEventListener('click', fetchAllData);
+    document.getElementById('resetTimetable').addEventListener('click', () => {
+      document.querySelector('#timetable tbody').innerHTML = '';
+    });
+
+    document.getElementById('saveTimetable').addEventListener('click', () => {
+      const element = document.getElementById('timetableContainer');
+      html2pdf().from(element).save('timetable.pdf');
+    });
+
+    document.getElementById('saveToDatabase').addEventListener('click', async () => {
+      const rows = document.querySelectorAll('#timetable tbody tr');
+      const assigned_courses = [];
+      rows.forEach(r => {
+        const cells = r.querySelectorAll('td');
+        if(cells[2].textContent) { // course
+          assigned_courses.push({
+            id: cells[2].textContent.split(' ')[0], // crude split, replace with actual course id mapping
+            start_time: cells[1].textContent.split(' - ')[0],
+            end_time: cells[1].textContent.split(' - ')[1],
+            room_number: cells[4].textContent
+          });
+        }
+      });
+
+      try {
+        const res = await fetch('/save-timetable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assigned_courses })
+        });
+        const data = await res.json();
+        alert(data.message || 'Saved!');
+      } catch(err) {
+        console.error(err);
+        alert('Failed to save timetable');
+      }
+    });
+
+    // --- Data Entry Handlers ---
+    document.getElementById('addCourseForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('courseName').value;
+      const section = document.getElementById('courseSection').value;
+      const department = document.getElementById('courseDepartment').value;
+      const color = document.getElementById('courseColor').value;
+      try {
+        const res = await fetch('/api/add-course', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, section, department, color })
+        });
+        const data = await res.json();
+        alert(data.message || 'Course added!');
+        fetchAllData();
+        this.reset();
+      } catch(err) {
+        alert('Failed to add course');
+      }
+    });
+
+    document.getElementById('addRoomForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const room_number = document.getElementById('roomNumber').value;
+      const building_name = document.getElementById('buildingName').value;
+      try {
+        const res = await fetch('/api/add-room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room_number, building_name })
+        });
+        const data = await res.json();
+        alert(data.message || 'Room added!');
+        fetchAllData();
+        this.reset();
+      } catch(err) {
+        alert('Failed to add room');
+      }
+    });
+
+    document.getElementById('addInstructorForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('instructorName').value;
+      try {
+        const res = await fetch('/api/add-instructor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        alert(data.message || 'Instructor added!');
+        fetchAllData();
+        this.reset();
+      } catch(err) {
+        alert('Failed to add instructor');
+      }
+    });
+
+    // --- Init ---
+    fetchAllData();
+  </script>
 </body>
-
 </html>

@@ -1,3 +1,26 @@
+# Add Subject
+@app.route('/api/add-subject', methods=['POST'])
+def add_subject():
+    data = request.get_json()
+    subject_code = data.get('subjectCode')
+    subject_name = data.get('subjectName')
+    faculty_name = data.get('facultyName')
+    venue = data.get('venue')
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO subjects (code, name, faculty, venue) VALUES (?, ?, ?, ?)', (subject_code, subject_name, faculty_name, venue))
+        conn.commit()
+        return jsonify({'message': 'Subject added successfully'})
+    except Exception as e:
+        print('Error adding subject:', e)
+        return jsonify({'error': 'Failed to add subject'}), 500
+    finally:
+        conn.close()
+
+
 import os
 from flask import Flask, render_template, jsonify, request
 from flask.cli import load_dotenv
@@ -5,234 +28,259 @@ import pyodbc
 
 app = Flask(__name__)
 
-# Define your connection string
-conn_str = (
-    r'DRIVER={ODBC Driver 17 for SQL Server};'
-   r'SERVER=DESKTOP-99MP30B;'
-   r'DATABASE=timetable;'
-    r'Trusted_Connection=yes;'
-)
-
-# Load environment variables from .env file
+# -------------------------
+# Load environment variables
+# -------------------------
 load_dotenv()
-
-# Get connection string from environment variable
 conn_str = os.getenv("DB_CONNECTION_STRING")
 
-# Create a connection and a cursor
-if conn_str:
+# -------------------------
+# Helper function for DB connection
+# -------------------------
+def get_db_connection():
     try:
-        # Create a connection and a cursor
-        connection = pyodbc.connect(conn_str)
-        cursor = connection.cursor()
-        print("Database connection successful!")
+        conn = pyodbc.connect(conn_str or
+                              'DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=timetable;Trusted_Connection=yes;')
+        return conn
     except pyodbc.Error as e:
-        print(f"Database connection failed: {e}")
-else:
-    print("Warning: No database connection string found. Ensure the .env file is set up correctly.")
+        print(f"DB connection error: {e}")
+        return None
 
-# API endpoint to fetch courses
+# -------------------------
+# Helper function to convert pyodbc rows to dict
+# -------------------------
+def rows_to_dict(cursor, rows):
+    columns = [column[0] for column in cursor.description]
+    return [dict(zip(columns, row)) for row in rows]
+
+# -------------------------
+# API routes for adding and fetching data
+# -------------------------
+
+# Add Course
+@app.route('/api/add-course', methods=['POST'])
+def add_course():
+    data = request.get_json()
+    name = data.get('name')
+    section = data.get('section')
+    department = data.get('department')
+    color = data.get('color')
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO courses (name, color, department) VALUES (?, ?, ?)', (name, color, department))
+        course_id = cursor.execute('SELECT @@IDENTITY AS id').fetchone()[0]
+        cursor.execute('INSERT INTO courseSections (courseID, section) VALUES (?, ?)', (course_id, section))
+        conn.commit()
+        return jsonify({'message': 'Course added successfully'})
+    except Exception as e:
+        print('Error adding course:', e)
+        return jsonify({'error': 'Failed to add course'}), 500
+    finally:
+        conn.close()
+
+# Add Room
+@app.route('/api/add-room', methods=['POST'])
+def add_room():
+    data = request.get_json()
+    room_number = data.get('room_number')
+    building_name = data.get('building_name')
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT id FROM buildings WHERE name = ?', (building_name,))
+        building = cursor.fetchone()
+        if building:
+            building_id = building[0]
+        else:
+            cursor.execute('INSERT INTO buildings (name) VALUES (?)', (building_name,))
+            building_id = cursor.execute('SELECT @@IDENTITY AS id').fetchone()[0]
+        cursor.execute('INSERT INTO rooms (room_number, building_id) VALUES (?, ?)', (room_number, building_id))
+        conn.commit()
+        return jsonify({'message': 'Room added successfully'})
+    except Exception as e:
+        print('Error adding room:', e)
+        return jsonify({'error': 'Failed to add room'}), 500
+    finally:
+        conn.close()
+
+# Add Instructor
+@app.route('/api/add-instructor', methods=['POST'])
+def add_instructor():
+    data = request.get_json()
+    name = data.get('name')
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO instructors (name) VALUES (?)', (name,))
+        conn.commit()
+        return jsonify({'message': 'Instructor added successfully'})
+    except Exception as e:
+        print('Error adding instructor:', e)
+        return jsonify({'error': 'Failed to add instructor'}), 500
+    finally:
+        conn.close()
+
+# Get Courses
 @app.route('/api/courses')
 def get_courses():
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
     try:
-        # Use the cursor to execute SQL queries
         cursor.execute('''
             SELECT c.id, c.name, c.color, c.department, s.section
             FROM courses c
             JOIN courseSections s ON c.id = s.courseID
         ''')
-    
-        # Fetch all rows
         rows = cursor.fetchall()
-
-        # Convert the result to a list of dictionaries
-        courses = []
-        for row in rows:
-            course = {
-                'id': row.id,
-                'name': row.name,
-                'color': row.color,
-                'department': row.department,
-                'section': row.section,
-            }
-            courses.append(course)
-
-        # Log a message indicating successful course fetching
-        print("Courses fetched successfully")
-
+        courses = rows_to_dict(cursor, rows)
         return jsonify(courses)
-
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-
-        # Log an error message in case of an exception
-        print("Error fetching courses:", str(e))
-
+        print("Error fetching courses:", e)
         return jsonify({'error': 'Failed to fetch courses'}), 500
+    finally:
+        conn.close()
 
-
-# API endpoint to fetch course details
-@app.route('/api/course-details/<int:course_id>/<string:section>')
-def get_course_details(course_id, section):
-    try:
-        # Use the cursor to execute SQL queries
-        cursor.execute('''
-            SELECT c.id, c.name, i.name as instructor, t.section, c.color, c.department, COUNT(e.RollNumber) as num_students
-            FROM courses c
-            LEFT JOIN CoursesTaughtBy t ON c.id = t.course_id
-            LEFT JOIN instructors i ON t.instructor_id = i.id
-            LEFT JOIN StudentCourseEnrollment e ON c.id = e.CourseID AND t.section = e.CourseSection
-            WHERE c.id = ? AND t.section = ?
-            GROUP BY c.id, c.name, i.name, t.section, c.color, c.department
-        ''', (course_id, section))
-
-        # Fetch the row
-        row = cursor.fetchone()
-
-        if row:
-            # Construct a dictionary with the course details
-            course_details = {
-                'id': row.id,
-                'name': f'{row.name} - {row.section}',  # Combine course name and section
-                'instructor': row.instructor,
-                'section': row.section,
-                'color': row.color,
-                'department': row.department,
-                'num_students': row.num_students,
-            }
-
-            return jsonify(course_details)
-        else:
-            # Handle the case where the course is not found
-            return jsonify({'error': 'Course not found for the specified section'}), 404
-
-    except Exception as e:
-        # Log the exception for debugging
-        print(f"Error fetching course details: {str(e)}")
-
-        # Return an error response
-        return jsonify({'error': 'Internal Server Error'}), 500
-
+# Get Rooms
 @app.route('/api/rooms')
 def get_rooms():
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
     try:
-        # Use the cursor to execute SQL queries
         cursor.execute('''
             SELECT r.id, r.room_number, b.name AS building_name
             FROM rooms r
             JOIN buildings b ON r.building_id = b.id
         ''')
-
-        # Fetch all rows
         rows = cursor.fetchall()
-
-        # Convert the result to a list of dictionaries
-        rooms = []
-        for row in rows:
-            room = {
-                'id': row.id,
-                'room_number': row.room_number,
-                'building_name': row.building_name,
-            }
-            rooms.append(room)
-
-        # Log a message indicating successful room fetching
-        print("Rooms fetched successfully")
-
+        rooms = rows_to_dict(cursor, rows)
         return jsonify(rooms)
-
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-
-        # Log an error message in case of an exception
-        print("Error fetching rooms:", str(e))
-
+        print("Error fetching rooms:", e)
         return jsonify({'error': 'Failed to fetch rooms'}), 500
+    finally:
+        conn.close()
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    result = None
+    try:
+        # Sample data
+        courses = [
+            {'name': 'Mathematics', 'color': '#e57373', 'department': 'Science', 'section': 'A'},
+            {'name': 'Physics', 'color': '#64b5f6', 'department': 'Science', 'section': 'B'},
+            {'name': 'Chemistry', 'color': '#81c784', 'department': 'Science', 'section': 'A'},
+            {'name': 'English', 'color': '#ffd54f', 'department': 'Arts', 'section': 'C'},
+            {'name': 'Computer Science', 'color': '#ba68c8', 'department': 'Engineering', 'section': 'A'}
+        ]
+        for c in courses:
+            cursor.execute('INSERT INTO courses (name, color, department) VALUES (?, ?, ?)', (c['name'], c['color'], c['department']))
+            course_id = cursor.execute('SELECT @@IDENTITY AS id').fetchone()[0]
+            cursor.execute('INSERT INTO courseSections (courseID, section) VALUES (?, ?)', (course_id, c['section']))
+        conn.commit()
+        result = jsonify({'message': 'Sample courses inserted successfully'})
+    except Exception as e:
+        print('Error inserting sample courses:', e)
+        result = jsonify({'error': 'Failed to insert sample courses'}), 500
+    finally:
+        conn.close()
+    return result
 
 
 @app.route('/api/students')
 def get_students():
-    connection = pyodbc.connect(conn_str)
-    cursor = connection.cursor()
-    cursor.execute('SELECT * FROM Student')
-    rows = cursor.fetchall()
-
-    students = []
-    for row in rows:
-        student = {
-            'RollNumber': row.RollNumber,
-            'Name': row.Name,
-            'ParentSection': row.ParentSection,
-            'Degree': row.Degree,
-            'Batch': row.Batch,
-            'Gender': row.Gender,
-            'Email': row.Email,
-            'DateOfBirth': row.DateOfBirth,
-            'CNIC': row.CNIC,
-            'MobileNumber': row.MobileNumber,
-            'BloodGroup': row.BloodGroup,
-            'Nationality': row.Nationality
-        }
-        students.append(student)
-
-    return jsonify(students)
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT * FROM Student')
+        rows = cursor.fetchall()
+        students = rows_to_dict(cursor, rows)
+        return jsonify(students)
+    except Exception as e:
+        print("Error fetching students:", e)
+        return jsonify({'error': 'Failed to fetch students'}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/student-enrollments')
 def get_student_enrollments():
-    connection = pyodbc.connect(conn_str)
-    cursor = connection.cursor()
-    cursor.execute('SELECT * FROM StudentCourseEnrollment')
-    rows = cursor.fetchall()
-
-    enrollments = []
-    for row in rows:
-        enrollment = {
-            'EnrollmentID': row.EnrollmentID,
-            'RollNumber': row.RollNumber,
-            'CourseID': row.CourseID,
-            'EnrollmentDate': row.EnrollmentDate
-        }
-        enrollments.append(enrollment)
-
-    return jsonify(enrollments)
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT * FROM StudentCourseEnrollment')
+        rows = cursor.fetchall()
+        enrollments = rows_to_dict(cursor, rows)
+        return jsonify(enrollments)
+    except Exception as e:
+        print("Error fetching enrollments:", e)
+        return jsonify({'error': 'Failed to fetch enrollments'}), 500
+    finally:
+        conn.close()
 
 
-# Save button route
 @app.route('/save-timetable', methods=['POST'])
 def save_timetable():
-    # Receive the data from the front end
-    data = request.get_json()
-
-    # Extract information about assigned courses
-    assigned_courses = data.get('assigned_courses', [])
-
-    # Insert records into the timeslots table
-    for course in assigned_courses:
-        query = f"""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        data = request.get_json()
+        assigned_courses = data.get('assigned_courses', [])
+        values = [(c['id'], c['start_time'], c['end_time'], c['room_number']) for c in assigned_courses]
+        cursor.executemany('''
             INSERT INTO timeslots (course_name, start_time, end_time, room_number)
-            VALUES ('{course['name']}', '{course['start_time']}', '{course['end_time']}', '{course['room_number']}')
-        """
-        cursor.execute(query)
+            VALUES (?, ?, ?, ?)
+        ''', values)
+        conn.commit()
+        return jsonify({'message': 'Timetable saved successfully'})
+    except Exception as e:
+        print("Error saving timetable:", e)
+        return jsonify({'error': 'Failed to save timetable'}), 500
+    finally:
+        conn.close()
 
-    connection.commit()
 
-    return jsonify({'message': 'Timetable saved successfully'})
-
-# Reset button route
 @app.route('/reset-timetable', methods=['POST'])
 def reset_timetable():
-    # Delete all records from the timeslots table
-    cursor.execute('DELETE FROM timeslots')
-    connection.commit()
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No database connection'}), 500
+    cursor = conn.cursor()
+    try:
+        cursor.execute('DELETE FROM timeslots')
+        conn.commit()
+        return jsonify({'message': 'Timetable reset successfully'})
+    except Exception as e:
+        print("Error resetting timetable:", e)
+        return jsonify({'error': 'Failed to reset timetable'}), 500
+    finally:
+        conn.close()
 
-    return jsonify({'message': 'Timetable reset successfully'})
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+# -------------------------
+# Run the app
+# -------------------------
 if __name__ == '__main__':
     app.run(debug=True)
